@@ -1,0 +1,11 @@
+.pio
+.vscode
+*.pem
+ciotc_config.h
+bq-keys
+keys
+bin/
+lib/
+include/
+mosquitto*
+

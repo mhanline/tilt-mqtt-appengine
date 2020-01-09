@@ -1,0 +1,9 @@
+runtime: python37
+
+#[START env]
+env_variables:
+    PUBSUB_TOPIC: tilt-logger
+    PUBSUB_VERIFICATION_TOKEN: rwxuUifwFV3pgpE3gVVQ
+    OAUTH2_CLIENT_ID: 35323488319-f17ghl687acfq6g44rocimrpbgd8fljt.apps.googleusercontent.com
+    OAUTH2_CLIENT_SECRET: Rpav38JCCr-_fAW0WkI3PvW8
+#[END env]
