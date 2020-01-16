@@ -1,11 +1,11 @@
-.pio
 .vscode
 *.pem
-ciotc_config.h
 bq-keys
-keys
+keys/*
 bin/
 lib/
 include/
 mosquitto*
+env_config.yaml
+client-secrets.*
 

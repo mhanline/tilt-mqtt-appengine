@@ -1,79 +1,111 @@
-# Python 3 Google Cloud Pub/Sub sample for Google App Engine Standard Environment
-
-[![Open in Cloud Shell][shell_img]][shell_link]
-
-[shell_img]: http://gstatic.com/cloudssh/images/open-btn.png
-[shell_link]: https://console.cloud.google.com/cloudshell/open?git_repo=https://github.com/GoogleCloudPlatform/python-docs-samples&page=editor&open_in_editor=appengine/standard/pubsub/README.md
-
-This demonstrates how to send and receive messages using [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) on [Google App Engine Standard Environment](https://cloud.google.com/appengine/docs/standard/).
+# Tilt Gateway AppEngine parser to BigQuery and Google Sheets
 
 ## Setup
 
-Before you can run or deploy the sample, you will need to do the following:
+Set up the Google Cloud project, service accounts, datasets, tables:
+(Assume you are using the Google Cloud Console, otherwise replace $DEVSHELL_PROJECT_ID environment variable with your actual DEVSHELL_PROJECT_ID)
 
-1. Enable the Cloud Pub/Sub API in the [Google Developers Console](https://console.developers.google.com/project/_/apiui/apiview/pubsub/overview).
+1. Create a new project and assign a billing account.
+ Note: This should utilise the GCP free tier but you will still need a valid credit card in case your app goes over the free tier
 
-2. Create a topic and subscription. Your push auth service account must have Service Account Token Creator Role assigned, which can be done in the Cloud Console [IAM & admin](https://console.cloud.google.com/iam-admin/iam) UI. `--push-auth-token-audience` is optional. If set, remember to modify the audience field check in `main.py` (line 88).
+```
+# Clone this project 
+git clone ...
+```
+2. Enable APIs:
+```
+gcloud services enable pubsub.googleapis.com
+gcloud services enable cloudiot.googleapis.com
+gcloud services enable sheets.googleapis.com
+gcloud services enable bigquery.googleapis.com
+gcloud services enable drive.googleapis.com
+```
 
-        $ gcloud pubsub topics create [your-topic-name]
-        $ gcloud beta pubsub subscriptions create [your-subscription-name] \
-            --topic=[your-topic-name] \
-            --push-endpoint=\
-                https://[your-app-id].appspot.com/_ah/push-handlers/receive_messages?token=[your-token] \
-            --ack-deadline=30 \
-            --push-auth-service-account=[your-service-account-email] \
-            --push-auth-token-audience=example.com
+3. export environment variables:
+```
+export APPENGINE_REGION="us-central"
+export PUBSUB_TOPIC="tilt-gateways"
+export PUBSUB_SUBSCRIPTION="tilt-gateway-sub"
+export IOTCORE_REGION="us-central1"
+export REGISTRY_NAME="iot-core-tilt-registry"
+# Name you configure in the Tilt gateway
+export DEVICE_NAME=""
+export SA_EMAIL=service-`gcloud projects list --filter="$DEVSHELL_PROJECT_ID" --format="value(PROJECT_NUMBER)"`@gcp-sa-pubsub.iam.gserviceaccount.com
+export PUBSUB_TOKEN="Long_string_of_rnd_chars"
+export BQ_REGION='us-west2'
+```
 
-3. Update the environment variables in ``app.yaml``.
+4. Pub/Sub
+```
+# This allows pubsub to generate keys using its own internal service account
+gcloud projects add-iam-policy-binding ${DEVSHELL_PROJECT_ID} --member="serviceAccount:${SA_EMAIL}" --role='roles/iam.serviceAccountTokenCreator'
 
-## Running locally
+# This creates a new service account for sending authenticated pushes to AppEngine 
+gcloud iam service-accounts create sa-pubsub-test --display-name "Pub/Sub ${PUBSUB_TOPIC} Push Subscription Service Account"
 
-When running locally, you can use the [Google Cloud SDK](https://cloud.google.com/sdk) to provide authentication to use Google Cloud APIs:
+# Creates the push subscription from IoT Core to App Engine
+gcloud pubsub subscriptions create $PUBSUB_SUBSCRIPTION --topic $PUBSUB_TOPIC --push-endpoint https://${DEVSHELL_PROJECT_ID}.appspot.com/_ah/push-handlers/receive_messages?token=$PUBSUB_TOKEN --push-auth-service-account=sa-pubsub-test@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com --ack-deadline 10
+```
 
-    $ gcloud init
+5. Cloud IoT core
+```
+# Allow the IoT Core service account to publish to Pub/Sub
+gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
+  --member=serviceAccount:cloud-iot@system.gserviceaccount.com \
+  --role=roles/pubsub.publisher
 
-Install dependencies, preferably with a virtualenv:
+#Create Cloud IoT registry specifying Cloud Pub/Sub topic name 
+gcloud iot registries create $REGISTRY_NAME --region=$IOTCORE_REGION --enable-mqtt-config --enable-http-config --event-notification-config=topic=${PUBSUB_TOPIC}
 
-    $ virtualenv env
-    $ source env/bin/activate
-    $ pip install -r requirements.txt
+# Generate an Eliptic Curve (EC) ES256 private / public key pair
+#To-Do: Remove the private key from upload.
+openssl ecparam -genkey -name prime256v1 -noout -out keys/${DEVICE_NAME}_ec_private.pem
+openssl ec -in keys/${DEVICE_NAME}_ec_private.pem -pubout -out keys/${DEVICE_NAME}_ec_public.pem
 
-Then set environment variables before starting your application:
+# Create a new Cloud IoT device
+gcloud iot devices create $DEVICE_NAME \
+  --region=$IOTCORE_REGION \
+  --registry=$REGISTRY_NAME \
+  --public-key="path=./keys/${DEVICE_NAME}_ec_public.pem,type=es256"
+```
+6. Sheets Setup
+```
+# Setup Service Account
+gcloud iam service-accounts create sa-sheets-append --display-name "sa-sheets-append"
+gcloud iam service-accounts keys create keys/sa-sheets-append-key.json --iam-account sa-sheets-append@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com
+#Shouldn't be needed
+gcloud projects add-iam-policy-binding ${DEVSHELL_PROJECT_ID} --member serviceAccount:sa-sheets-append@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com --role roles/iam.serviceAccountUser
+```
+Manual process:
+- Create a new blank Google Sheet
+- Name the first tab with the colour of the Tilt you have
+- Click "Share", then set the service account user with edit permissions
+7. BigQuery setup
+```
+# Create the service account and key
+gcloud iam service-accounts create sa-bq-loader --display-name "bq-loader"
+gcloud iam service-accounts keys create keys/sa-bq-loader-key.json --iam-account sa-bq-loader@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com
 
-    $ export GOOGLE_CLOUD_PROJECT=[your-project-name]
-    $ export PUBSUB_VERIFICATION_TOKEN=[your-verification-token]
-    $ export PUBSUB_TOPIC=[your-topic]
-    $ python main.py
+# Allow the service account permissions in BigQuery to load data
+gcloud projects add-iam-policy-binding ${DEVSHELL_PROJECT_ID} --member serviceAccount:sa-bq-loader@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com --role roles/bigquery.dataEditor
+gcloud projects add-iam-policy-binding ${DEVSHELL_PROJECT_ID} --member serviceAccount:sa-bq-loader@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com --role roles/bigquery.jobUser
+gcloud projects add-iam-policy-binding ${DEVSHELL_PROJECT_ID} --member serviceAccount:sa-bq-loader@${DEVSHELL_PROJECT_ID}.iam.gserviceaccount.com --role roles/iam.serviceAccountUser
 
-### Simulating push notifications
+# Create the BigQuery dataset and table
+bq --location=$BQ_REGION mk --dataset --description "tilt log dataset" tilt_log_dataset
+bq mk --table tilt_log_dataset.tilt_log_table tilt-logger-schema.json
+```
+8. Deploy App Engine app
+```
+cp env_config.yaml.sample env_config.yaml
+```
+Edit the particulars of env_config.yaml 
 
-The application can send messages locally, but it is not able to receive push messages locally. You can, however, simulate a push message by making an HTTP request to the local push notification endpoint. There is an included ``sample_message.json``. You can use
-``curl`` or [httpie](https://github.com/jkbrzt/httpie) to POST this:
+```
 
-    $ curl -i --data @sample_message.json "localhost:8080/_ah/push-handlers/receive_messages?token=[your-token]"
 
-Or
+gcloud app create --region=$APPENGINE_REGION
+gcloud app deploy
 
-    $ http POST ":8080/_ah/push-handlers/receive_messages?token=[your-token]" < sample_message.json
+```
 
-Response:
-
-    HTTP/1.0 400 BAD REQUEST
-    Content-Type: text/html; charset=utf-8
-    Content-Length: 58
-    Server: Werkzeug/0.15.2 Python/3.7.3
-    Date: Sat, 06 Apr 2019 04:56:12 GMT
-
-    Invalid token: 'NoneType' object has no attribute 'split'
-
-The simulated push request fails because it does not have a Cloud Pub/Sub-generated JWT in the "Authorization" header.
-
-## Running on App Engine
-
-Note: Not all the files in the current directory are needed to run your code on App Engine. Specifically, `main_test.py` and the `data` directory, which contains a mocked private key file and a mocked public certs file, are for testing purposes only. They SHOULD NOT be included when deploying your app. When your app is up and running, Cloud Pub/Sub's push servers create tokens using a private key, then the Google Auth Python library takes care of verifying and decoding the token using Google's public certs, to confirm that the push requests indeed come from Cloud Pub/Sub.
-
-In the current directory, deploy using `gcloud`:
-
-    $ gcloud app deploy app.yaml
-
-You can now access the application at `https://[your-app-id].appspot.com`. You can use the form to submit messages, but it's non-deterministic which instance of your application will receive the notification. You can send multiple messages and refresh the page to see the received message.

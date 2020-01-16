@@ -1,0 +1,4 @@
+env_variables:
+    PUBSUB_TOPIC: 
+    PUBSUB_VERIFICATION_TOKEN: 
+    GATEWAYCONFIG: "{'tiltname-1': {'sheetId': 'sheetID','timezone': 'Australia/Brisbane'},'tiltname-2': {'sheetId': 'SheetID','timezone': 'Australia/Sydney'}}"

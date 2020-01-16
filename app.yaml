@@ -1,9 +1,12 @@
 runtime: python37
-
-#[START env]
+# Configs static across environments
 env_variables:
-    PUBSUB_TOPIC: tilt-logger
-    PUBSUB_VERIFICATION_TOKEN: rwxuUifwFV3pgpE3gVVQ
-    OAUTH2_CLIENT_ID: 35323488319-f17ghl687acfq6g44rocimrpbgd8fljt.apps.googleusercontent.com
-    OAUTH2_CLIENT_SECRET: Rpav38JCCr-_fAW0WkI3PvW8
-#[END env]
+    PUBSUB_TOPIC: tilt-gateways
+    BQ_DATASET: tilt_log_dataset
+    BQ_TABLE: tilt_log_table
+    BQ_KEYPATH: "keys/sa-bq-loader-key.json"
+includes:
+- env_config.yaml
+
+#env_config should include following environment variables:
+# PUBSUB_TOPIC, PUBSUB_VERIFICATION_TOKEN, GATEWAYCONFIG

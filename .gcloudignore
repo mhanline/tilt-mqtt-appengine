@@ -17,3 +17,9 @@
 __pycache__/
 # Ignored by the build system
 /setup.cfg
+
+# Custom ignores
+bin/
+lib/
+client-secrets.yaml
+app.yaml.template

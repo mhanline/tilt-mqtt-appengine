@@ -1,0 +1,47 @@
+[
+    {
+        "name": "messageId",
+        "type": "INT64",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "deviceId",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "deviceRegistryId",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "deviceLogTime",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "cloudLogTime",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "specificGravity",
+        "type": "FLOAT64",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "colour",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "temperature",
+        "type": "FLOAT64",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "deviceRegistryLocation",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    }
+]
